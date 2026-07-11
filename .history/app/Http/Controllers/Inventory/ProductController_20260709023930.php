@@ -26,10 +26,10 @@ class ProductController extends Controller
             ->latest()
             ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+return response()->json([
+    'success' => true,
+    'data' => $products,
+]);
     }
 
 

@@ -18,6 +18,7 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      *
+     * @return Factory|View|\Illuminate\View\View
      */
     public function index(Request $request)
     {
@@ -26,10 +27,10 @@ class ProductController extends Controller
             ->latest()
             ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+return response()->json([
+    'success' => true,
+    'data' => $products,
+]);
     }
 
 

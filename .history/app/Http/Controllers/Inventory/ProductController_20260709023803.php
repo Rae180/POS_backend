@@ -18,6 +18,7 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      *
+     * @return Factory|View|\Illuminate\View\View
      */
     public function index(Request $request)
     {
@@ -26,10 +27,9 @@ class ProductController extends Controller
             ->latest()
             ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+        return $request->wantsJson()
+            ? response()->json($products)
+            : view('products.index', ['products' => $products]);
     }
 
 
@@ -81,6 +81,7 @@ class ProductController extends Controller
     /**
      * Update the specified resource in storage.
      *
+     * @return RedirectResponse
      */
     public function update(ProductUpdateRequest $request, Product $product)
     {
@@ -95,11 +96,8 @@ class ProductController extends Controller
 
         $product->update($productData);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'data' => $product,
-        ]);
+        return redirect()->route('products.index')
+            ->with('success', __('product.success_updating'));
     }
 
     /**
@@ -112,9 +110,6 @@ class ProductController extends Controller
         }
         $product->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product deleted successfully',
-        ]);
+        return response()->json(['success' => true]);
     }
 }
