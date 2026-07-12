@@ -23,6 +23,7 @@ class SettingsSeeder extends Seeder
             ], [
                 'value' => $value['value']
             ]);
+            Setting::firstOrCreate(['key' => 'tax_rate'], ['value' => '0']);
         }
     }
 }

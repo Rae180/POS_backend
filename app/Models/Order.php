@@ -41,8 +41,58 @@ class Order extends Model
 
     protected $fillable = [
         'customer_id',
-        'user_id'
+        'user_id',
+        'status',
+        'refunded_at',
+        'refund_reason',
+        'discount_percent',
+        'tax_rate',
     ];
+
+    protected $casts = [
+        'refunded_at' => 'datetime',
+        'discount_percent' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
+    ];
+
+    public function isRefunded(): bool
+    {
+        return $this->status === 'refunded';
+    }
+
+    public function discountAmount(): float
+    {
+        return round($this->subtotal() * ((float) $this->discount_percent / 100), 2);
+    }
+
+    /**
+     * Raw sum of item prices, before discount/tax.
+     */
+    public function subtotal(): float
+    {
+        if ($this->relationLoaded('items')) {
+            return (float) $this->items->sum('price');
+        }
+        return (float) $this->items()->sum('price');
+    }
+
+    public function taxableAmount(): float
+    {
+        return $this->subtotal() - $this->discountAmount();
+    }
+
+    public function taxAmount(): float
+    {
+        return round($this->taxableAmount() * ((float) $this->tax_rate / 100), 2);
+    }
+
+    /**
+     * Total amount actually owed — subtotal minus discount, plus tax.
+     */
+    public function total(): float
+    {
+        return round($this->taxableAmount() + $this->taxAmount(), 2);
+    }
 
     /**
      * Get the order items.
@@ -86,16 +136,6 @@ class Order extends Model
             : __('walk_in');
     }
 
-    /**
-     * Calculate order total.
-     */
-    public function total(): float
-    {
-        if ($this->relationLoaded('items')) {
-            return (float) $this->items->sum('price');
-        }
-        return (float) $this->items()->sum('price');
-    }
 
     /**
      * Get formatted total.

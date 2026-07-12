@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Order;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class OrderStoreRequest extends FormRequest
 {
@@ -18,6 +19,8 @@ class OrderStoreRequest extends FormRequest
         return [
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'amount' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'payment_method' => ['required', 'string', Rule::in(\App\Models\Payment::METHODS)],
         ];
     }
 

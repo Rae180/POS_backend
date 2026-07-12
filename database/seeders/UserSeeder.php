@@ -12,13 +12,15 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::updateOrCreate([
+        $admin = User::updateOrCreate([
             'email' => 'admin@gmail.com'
         ], [
             'first_name' => 'Admin',
             'last_name' => 'admin',
-            'email'=>'admin@gmail.com',
+            'email' => 'admin@gmail.com',
             'password' => bcrypt('admin123')
         ]);
+
+        $admin->assignRole('admin');
     }
 }

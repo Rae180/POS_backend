@@ -1,0 +1,78 @@
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Tests\TestCase;
+
+class OrderReceiptTest extends TestCase
+{
+    /**
+     * A basic feature test example.
+     */
+
+    use RefreshDatabase;
+
+
+    public function test_order_receipt_returns_expected_structure(): void
+    {
+        $order = \App\Models\Order::factory()
+            ->has(\App\Models\OrderItem::factory()->count(2), 'items')
+            ->has(\App\Models\Payment::factory(), 'payments')
+            ->create();
+
+        $this->actingAs($order->user)
+            ->getJson(route('orders.receipt', $order))
+            ->assertOk()
+            ->assertJsonStructure([
+                'receipt_number',
+                'date',
+                'cashier',
+                'customer',
+                'items' => [['product_name', 'quantity', 'unit_price', 'subtotal']],
+                'subtotal',
+                'total',
+                'amount_paid',
+                'balance_due',
+                'is_fully_paid',
+            ]);
+    }
+
+    public function test_order_refund_restocks_items_and_reverses_payment(): void
+    {
+        $product = \App\Models\Product::factory()->create(['quantity' => 5]);
+
+        $order = \App\Models\Order::factory()->create();
+        $item = $order->items()->create([
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'price' => 20,
+        ]);
+        $order->payments()->create(['amount' => 20, 'user_id' => $order->user_id]);
+
+        $this->actingAs($order->user)
+            ->postJson(route('orders.refund', $order))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertEquals(7, $product->fresh()->quantity); // 5 + 2 restocked
+        $this->assertEquals('refunded', $order->fresh()->status);
+        $this->assertEquals(0, $order->fresh()->receivedAmount()); // 20 - 20
+    }
+
+    public function test_order_total_applies_discount_then_tax(): void
+    {
+        $order = \App\Models\Order::factory()->create([
+            'discount_percent' => 10,
+            'tax_rate' => 5,
+        ]);
+        $order->items()->create(['product_id' => \App\Models\Product::factory()->create()->id, 'quantity' => 1, 'price' => 100]);
+
+        // subtotal 100 -> discount 10% = 90 -> tax 5% of 90 = 4.5 -> total 94.5
+        $this->assertEquals(100.0, $order->subtotal());
+        $this->assertEquals(10.0, $order->discountAmount());
+        $this->assertEquals(4.5, $order->taxAmount());
+        $this->assertEquals(94.5, $order->total());
+    }
+}

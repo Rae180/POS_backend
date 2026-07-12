@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
@@ -29,19 +30,33 @@ use Illuminate\Support\Carbon;
  */
 class Payment extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'amount',
+        'payment_method',
         'order_id',
         'user_id',
+        'shift_id',
+
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
     ];
 
+    public const METHOD_CASH = 'cash';
+    public const METHOD_CARD = 'card';
+
+    public const METHODS = [self::METHOD_CASH, self::METHOD_CARD];
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class, 'order_id', 'id');
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 
     public function user(): BelongsTo
