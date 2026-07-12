@@ -20,11 +20,11 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
-        if (! Auth::attempt($credentials)) {
+        if (!Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid email or password.'],
             ]);
@@ -32,7 +32,11 @@ class AuthController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
-        $user->assignRole('cashier');
+
+        if ($user->roles()->doesntExist()) {
+            $user->assignRole('cashier');
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
@@ -40,7 +44,7 @@ class AuthController extends Controller
             'message' => 'Login successful.',
             'token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $user->load('roles'),
         ]);
     }
 

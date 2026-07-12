@@ -10,6 +10,7 @@ use App\Http\Controllers\Management\CustomerController;
 use App\Http\Controllers\Management\SupplierController;
 use App\Http\Controllers\Pos\CartController;
 use App\Http\Controllers\Pos\OrderController;
+use App\Http\Controllers\Pos\ShiftController;
 use App\Http\Controllers\Settings\SettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,117 +30,67 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
-
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
     /*
     |--------------------------------------------------------------------------
-    | Products
+    | Admin + Cashier: POS floor operations
     |--------------------------------------------------------------------------
     */
 
-    Route::apiResource('products', ProductController::class);
+    Route::middleware('role:admin|cashier')->group(function () {
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::get('/products/{product}', [ProductController::class, 'show']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Customers
-    |--------------------------------------------------------------------------
-    */
+        Route::apiResource('customers', CustomerController::class);
 
-    Route::apiResource('customers', CustomerController::class);
+        Route::apiResource('orders', OrderController::class)->except(['destroy']);
+        Route::post('/orders/partial-payment', [OrderController::class, 'partialPayment']);
+        Route::get('/orders/{order}/receipt', [OrderController::class, 'receipt']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Suppliers
-    |--------------------------------------------------------------------------
-    */
+        Route::prefix('cart')->group(function () {
+            Route::get('/', [CartController::class, 'index']);
+            Route::post('/', [CartController::class, 'store']);
+            Route::patch('/quantity', [CartController::class, 'changeQty']);
+            Route::delete('/item', [CartController::class, 'delete']);
+            Route::delete('/', [CartController::class, 'empty']);
+        });
 
-    Route::apiResource('suppliers', SupplierController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Orders
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('orders', OrderController::class);
-
-    Route::post(
-        '/orders/partial-payment',
-        [OrderController::class, 'partialPayment']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Purchases
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('purchases', PurchaseController::class);
-
-    Route::get(
-        '/purchases/data',
-        [PurchaseController::class, 'data']
-    );
-
-    Route::get(
-        '/purchases/{purchase}/receipt',
-        [PurchaseController::class, 'receipt']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | POS Cart
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('cart')->group(function () {
-
-        Route::get('/', [CartController::class, 'index']);
-
-        Route::post('/', [CartController::class, 'store']);
-
-        Route::patch('/quantity', [CartController::class, 'changeQty']);
-
-        Route::delete('/item', [CartController::class, 'delete']);
-
-        Route::delete('/', [CartController::class, 'empty']);
+        Route::get('/shift/current', [ShiftController::class, 'current']);
+        Route::post('/shift/open', [ShiftController::class, 'open']);
+        Route::post('/shift/close', [ShiftController::class, 'close']);
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Purchase Cart
+    | Admin only: inventory, purchasing, settings, money-reversing actions
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('purchase-cart')->group(function () {
+    Route::middleware('role:admin')->group(function () {
+        Route::apiResource('products', ProductController::class)->except(['index', 'show']);
+        Route::apiResource('suppliers', SupplierController::class);
 
-        Route::get('/', [PurchaseCartController::class, 'index']);
+        Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
+        Route::post('/orders/{order}/refund', [OrderController::class, 'refund']);
 
-        Route::post('/', [PurchaseCartController::class, 'store']);
+        Route::apiResource('purchases', PurchaseController::class);
+        Route::get('/purchases/data', [PurchaseController::class, 'data']);
+        Route::get('/purchases/{purchase}/receipt', [PurchaseController::class, 'receipt']);
 
-        Route::patch('/quantity', [PurchaseCartController::class, 'changeQty']);
+        Route::prefix('purchase-cart')->group(function () {
+            Route::get('/', [PurchaseCartController::class, 'index']);
+            Route::post('/', [PurchaseCartController::class, 'store']);
+            Route::patch('/quantity', [PurchaseCartController::class, 'changeQty']);
+            Route::patch('/price', [PurchaseCartController::class, 'changePrice']);
+            Route::delete('/item', [PurchaseCartController::class, 'delete']);
+            Route::delete('/', [PurchaseCartController::class, 'empty']);
+        });
 
-        Route::patch('/price', [PurchaseCartController::class, 'changePrice']);
+        Route::get('/shifts', [ShiftController::class, 'index']);
 
-        Route::delete('/item', [PurchaseCartController::class, 'delete']);
-
-        Route::delete('/', [PurchaseCartController::class, 'empty']);
+        Route::get('/settings', [SettingController::class, 'index']);
+        Route::put('/settings', [SettingController::class, 'store']);
     });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Settings
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/settings', [SettingController::class, 'index']);
-
-    Route::put('/settings', [SettingController::class, 'store']);
 });
