@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Product;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ProductStoreRequest extends FormRequest
 {
@@ -21,6 +22,7 @@ class ProductStoreRequest extends FormRequest
             'price' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
             'quantity' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'boolean'],
+            'category' => ['nullable', 'string', Rule::in(['Beverages', 'Snacks', 'Dairy', 'Produce', 'Bakery'])],
         ];
     }
 

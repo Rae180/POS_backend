@@ -14,6 +14,30 @@ use App\Models\Shift;
 
 class OrderController extends Controller
 {
+
+    public function apiIndex(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $orders = Order::query()
+            ->with(['items.product', 'payments', 'customer'])
+            ->when($request->input('start_date'), function ($query, $startDate): void {
+                $query->where('created_at', '>=', $startDate);
+            })
+            ->when($request->input('end_date'), function ($query, string $endDate): void {
+                $query->where('created_at', '<=', $endDate . ' 23:59:59');
+            })
+            ->latest()
+            ->paginate(10);
+
+        return response()->json([
+            'data' => OrderReceiptResource::collection($orders),
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'total' => $orders->total(),
+            ],
+        ]);
+    }
+
     public function index(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
         $orders = Order::query()

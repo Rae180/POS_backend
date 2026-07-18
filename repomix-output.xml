@@ -199,6 +199,7 @@ storage/framework/sessions/.gitignore
 storage/framework/testing/.gitignore
 storage/framework/views/.gitignore
 storage/logs/.gitignore
+tests/Feature/ApiRoleGatingTest.php
 tests/Feature/ExampleTest.php
 tests/Feature/OrderReceiptTest.php
 tests/Feature/OrderRefundPermissionTest.php
@@ -7307,6 +7308,56 @@ services.json
 !.gitignore
 </file>
 
+<file path="tests/Feature/ApiRoleGatingTest.php">
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ApiRoleGatingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolePermissionSeeder::class);
+    }
+
+
+
+    public function test_cashier_cannot_delete_supplier_via_api(): void
+    {
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cashier');
+
+        $supplier = \App\Models\Supplier::factory()->create();
+
+        $this->actingAs($cashier, 'sanctum')
+            ->deleteJson("/api/suppliers/{$supplier->id}")
+            ->assertForbidden();
+    }
+
+    public function test_login_does_not_overwrite_existing_admin_role(): void
+    {
+        $admin = User::factory()->create(['password' => bcrypt('secret123')]);
+        $admin->assignRole('admin');
+
+        $this->postJson('/api/login', [
+            'email' => $admin->email,
+            'password' => 'secret123',
+        ])->assertOk();
+
+        $this->assertTrue($admin->fresh()->hasRole('admin'));
+        $this->assertFalse($admin->fresh()->hasRole('cashier'));
+    }
+}
+</file>
+
 <file path="tests/Feature/ExampleTest.php">
 <?php
 
@@ -7663,79 +7714,6 @@ export default defineConfig({
         },
     },
 });
-</file>
-
-<file path="app/Http/Controllers/Auth/AuthController.php">
-<?php
-
-declare(strict_types=1);
-
-namespace App\Http\Controllers\Auth;
-
-use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-
-class AuthController extends Controller
-{
-    /**
-     * Login and return Sanctum token.
-     */
-    public function login(Request $request): JsonResponse
-    {
-        $credentials = $request->validate([
-            'email'    => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        if (! Auth::attempt($credentials)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid email or password.'],
-            ]);
-        }
-
-        /** @var User $user */
-        $user = Auth::user();
-        $user->assignRole('cashier');
-        $token = $user->createToken('api-token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful.',
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user,
-        ]);
-    }
-
-    /**
-     * Logout.
-     */
-    public function logout(Request $request): JsonResponse
-    {
-        $request->user()?->currentAccessToken()?->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully.',
-        ]);
-    }
-
-    /**
-     * Authenticated user.
-     */
-    public function me(Request $request): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'user' => $request->user(),
-        ]);
-    }
-}
 </file>
 
 <file path="app/Http/Controllers/Controller.php">
@@ -8640,154 +8618,6 @@ class UserSeeder extends Seeder
 }
 </file>
 
-<file path="routes/api.php">
-<?php
-
-declare(strict_types=1);
-
-use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Inventory\ProductController;
-use App\Http\Controllers\Inventory\PurchaseCartController;
-use App\Http\Controllers\Inventory\PurchaseController;
-use App\Http\Controllers\Management\CustomerController;
-use App\Http\Controllers\Management\SupplierController;
-use App\Http\Controllers\Pos\CartController;
-use App\Http\Controllers\Pos\OrderController;
-use App\Http\Controllers\Settings\SettingController;
-use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/login', [AuthController::class, 'login']);
-
-/*
-|--------------------------------------------------------------------------
-| Protected Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware('auth:sanctum')->group(function () {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
-
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Products
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('products', ProductController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Customers
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('customers', CustomerController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Suppliers
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('suppliers', SupplierController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Orders
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('orders', OrderController::class);
-
-    Route::post(
-        '/orders/partial-payment',
-        [OrderController::class, 'partialPayment']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Purchases
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('purchases', PurchaseController::class);
-
-    Route::get(
-        '/purchases/data',
-        [PurchaseController::class, 'data']
-    );
-
-    Route::get(
-        '/purchases/{purchase}/receipt',
-        [PurchaseController::class, 'receipt']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | POS Cart
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('cart')->group(function () {
-
-        Route::get('/', [CartController::class, 'index']);
-
-        Route::post('/', [CartController::class, 'store']);
-
-        Route::patch('/quantity', [CartController::class, 'changeQty']);
-
-        Route::delete('/item', [CartController::class, 'delete']);
-
-        Route::delete('/', [CartController::class, 'empty']);
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Purchase Cart
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('purchase-cart')->group(function () {
-
-        Route::get('/', [PurchaseCartController::class, 'index']);
-
-        Route::post('/', [PurchaseCartController::class, 'store']);
-
-        Route::patch('/quantity', [PurchaseCartController::class, 'changeQty']);
-
-        Route::patch('/price', [PurchaseCartController::class, 'changePrice']);
-
-        Route::delete('/item', [PurchaseCartController::class, 'delete']);
-
-        Route::delete('/', [PurchaseCartController::class, 'empty']);
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Settings
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/settings', [SettingController::class, 'index']);
-
-    Route::put('/settings', [SettingController::class, 'store']);
-});
-</file>
-
 <file path="routes/console.php">
 <?php
 
@@ -8808,6 +8638,83 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function (): void {
     $this->comment(Inspiring::quote());
 })->describe('Display an inspiring quote');
+</file>
+
+<file path="app/Http/Controllers/Auth/AuthController.php">
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+
+class AuthController extends Controller
+{
+    /**
+     * Login and return Sanctum token.
+     */
+    public function login(Request $request): JsonResponse
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        if (!Auth::attempt($credentials)) {
+            throw ValidationException::withMessages([
+                'email' => ['Invalid email or password.'],
+            ]);
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        if ($user->roles()->doesntExist()) {
+            $user->assignRole('cashier');
+        }
+
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful.',
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user->load('roles'),
+        ]);
+    }
+
+    /**
+     * Logout.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()?->currentAccessToken()?->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully.',
+        ]);
+    }
+
+    /**
+     * Authenticated user.
+     */
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'user' => $request->user(),
+        ]);
+    }
+}
 </file>
 
 <file path="bootstrap/app.php">
@@ -8949,6 +8856,105 @@ class DatabaseSeeder extends Seeder
         $this->call(RolePermissionSeeder::class);
     }
 }
+</file>
+
+<file path="routes/api.php">
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Inventory\ProductController;
+use App\Http\Controllers\Inventory\PurchaseCartController;
+use App\Http\Controllers\Inventory\PurchaseController;
+use App\Http\Controllers\Management\CustomerController;
+use App\Http\Controllers\Management\SupplierController;
+use App\Http\Controllers\Pos\CartController;
+use App\Http\Controllers\Pos\OrderController;
+use App\Http\Controllers\Pos\ShiftController;
+use App\Http\Controllers\Settings\SettingController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/login', [AuthController::class, 'login']);
+
+/*
+|--------------------------------------------------------------------------
+| Protected Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin + Cashier: POS floor operations
+    |--------------------------------------------------------------------------
+    */
+
+    Route::middleware('role:admin|cashier')->group(function () {
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::get('/products/{product}', [ProductController::class, 'show']);
+
+        Route::apiResource('customers', CustomerController::class);
+
+        Route::apiResource('orders', OrderController::class)->except(['destroy']);
+        Route::post('/orders/partial-payment', [OrderController::class, 'partialPayment']);
+        Route::get('/orders/{order}/receipt', [OrderController::class, 'receipt']);
+
+        Route::prefix('cart')->group(function () {
+            Route::get('/', [CartController::class, 'index']);
+            Route::post('/', [CartController::class, 'store']);
+            Route::patch('/quantity', [CartController::class, 'changeQty']);
+            Route::delete('/item', [CartController::class, 'delete']);
+            Route::delete('/', [CartController::class, 'empty']);
+        });
+
+        Route::get('/shift/current', [ShiftController::class, 'current']);
+        Route::post('/shift/open', [ShiftController::class, 'open']);
+        Route::post('/shift/close', [ShiftController::class, 'close']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin only: inventory, purchasing, settings, money-reversing actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::middleware('role:admin')->group(function () {
+        Route::apiResource('products', ProductController::class)->except(['index', 'show']);
+        Route::apiResource('suppliers', SupplierController::class);
+
+        Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
+        Route::post('/orders/{order}/refund', [OrderController::class, 'refund']);
+
+        Route::apiResource('purchases', PurchaseController::class);
+        Route::get('/purchases/data', [PurchaseController::class, 'data']);
+        Route::get('/purchases/{purchase}/receipt', [PurchaseController::class, 'receipt']);
+
+        Route::prefix('purchase-cart')->group(function () {
+            Route::get('/', [PurchaseCartController::class, 'index']);
+            Route::post('/', [PurchaseCartController::class, 'store']);
+            Route::patch('/quantity', [PurchaseCartController::class, 'changeQty']);
+            Route::patch('/price', [PurchaseCartController::class, 'changePrice']);
+            Route::delete('/item', [PurchaseCartController::class, 'delete']);
+            Route::delete('/', [PurchaseCartController::class, 'empty']);
+        });
+
+        Route::get('/shifts', [ShiftController::class, 'index']);
+
+        Route::get('/settings', [SettingController::class, 'index']);
+        Route::put('/settings', [SettingController::class, 'store']);
+    });
+});
 </file>
 
 <file path="routes/web.php">

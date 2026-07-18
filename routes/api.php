@@ -45,7 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('customers', CustomerController::class);
 
-        Route::apiResource('orders', OrderController::class)->except(['destroy']);
+        Route::get('/orders', [OrderController::class, 'apiIndex']);
+        Route::post('/orders', [OrderController::class, 'store']);
+        Route::get('/orders/{order}', [OrderController::class, 'show']);
         Route::post('/orders/partial-payment', [OrderController::class, 'partialPayment']);
         Route::get('/orders/{order}/receipt', [OrderController::class, 'receipt']);
 

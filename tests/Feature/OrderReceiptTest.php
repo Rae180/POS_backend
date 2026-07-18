@@ -75,4 +75,68 @@ class OrderReceiptTest extends TestCase
         $this->assertEquals(4.5, $order->taxAmount());
         $this->assertEquals(94.5, $order->total());
     }
+    public function test_api_orders_index_returns_json(): void
+    {
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $admin = \App\Models\User::factory()->create();
+        $admin->assignRole('admin');
+
+        \App\Models\Order::factory()->count(3)->create();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/orders')
+            ->assertOk()
+            ->assertJsonStructure(['data', 'meta' => ['current_page', 'last_page', 'total']]);
+    }
+
+    public function test_product_can_be_created_with_a_category(): void
+    {
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $admin = \App\Models\User::factory()->create();
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/products', [
+                'name' => 'Test Soda',
+                'barcode' => '123456789',
+                'price' => 2.50,
+                'quantity' => 10,
+                'category' => 'Beverages',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('products', ['name' => 'Test Soda', 'category' => 'Beverages']);
+    }
+
+    public function test_product_rejects_invalid_category(): void
+    {
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $admin = \App\Models\User::factory()->create();
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/products', [
+                'name' => 'Test Item',
+                'barcode' => '987654321',
+                'price' => 1.00,
+                'quantity' => 5,
+                'category' => 'NotARealCategory',
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_order_receipt_includes_id(): void
+    {
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+
+        $cashier = \App\Models\User::factory()->create();
+        $cashier->assignRole('cashier');
+
+        $order = \App\Models\Order::factory()->create();
+
+        $this->actingAs($cashier)
+            ->getJson("/api/orders/{$order->id}/receipt")
+            ->assertOk()
+            ->assertJsonPath('id', $order->id);
+    }
 }

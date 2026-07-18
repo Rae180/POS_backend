@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources;
 
+
 use Illuminate\Http\Request;
+use App\Models\Setting;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class OrderReceiptResource extends JsonResource
@@ -10,6 +12,7 @@ class OrderReceiptResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'id' => $this->id,
             'receipt_number' => 'ORD-' . str_pad($this->id, 6, '0', STR_PAD_LEFT),
             'date' => $this->created_at->toIso8601String(),
             'cashier' => $this->user->getFullname(),
@@ -40,7 +43,7 @@ class OrderReceiptResource extends JsonResource
             'balance_due' => round($this->remainingBalance(), 2),
             'is_fully_paid' => $this->isFullyPaid(),
 
-            'currency_symbol' => config('settings.currency_symbol', '$'),
+            'currency_symbol' => Setting::where('key', 'currency_symbol')->value('value') ?? '$',
             'status' => $this->status,
             'is_refunded' => $this->isRefunded(),
             'refunded_at' => $this->refunded_at?->toIso8601String(),

@@ -15,7 +15,7 @@ class ShiftController extends Controller
     {
         $shift = Shift::current();
 
-        if (! $shift) {
+        if (!$shift) {
             return response()->json([
                 'success' => false,
                 'message' => __('shift.none_open'),
@@ -61,7 +61,7 @@ class ShiftController extends Controller
     {
         $shift = Shift::current();
 
-        if (! $shift) {
+        if (!$shift) {
             return response()->json([
                 'success' => false,
                 'message' => __('shift.none_open'),
@@ -88,6 +88,23 @@ class ShiftController extends Controller
         $shifts = Shift::with(['openedBy', 'closedBy'])
             ->latest('opened_at')
             ->paginate(20);
+
+        $shifts->getCollection()->transform(function (Shift $shift) {
+            return [
+                'id' => $shift->id,
+                'opened_by' => $shift->openedBy,
+                'closed_by' => $shift->closedBy,
+                'opening_float' => (float) $shift->opening_float,
+                'closing_cash_counted' => $shift->closing_cash_counted !== null
+                    ? (float) $shift->closing_cash_counted
+                    : null,
+                'opened_at' => $shift->opened_at->toIso8601String(),
+                'closed_at' => $shift->closed_at?->toIso8601String(),
+                'notes' => $shift->notes,
+                'expected_cash_so_far' => $shift->expectedCash(),
+                'variance' => $shift->variance(),
+            ];
+        });
 
         return response()->json($shifts);
     }

@@ -28,7 +28,7 @@ class SupplierController extends Controller
         return view('suppliers.create');
     }
 
-    public function store(SupplierStoreRequest $request)
+    public function store(SupplierStoreRequest $request): \Illuminate\Http\RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $supplierData = $request->validated();
 
@@ -36,17 +36,20 @@ class SupplierController extends Controller
             $supplierData['avatar'] = $request->file('avatar')->store('suppliers', 'public');
         }
 
-        Supplier::create($supplierData);
+        $supplier = Supplier::create($supplierData);
+
+        if ($request->wantsJson()) {
+            return response()->json($supplier, 201);
+        }
 
         return redirect()->route('suppliers.index')
             ->with('success', __('supplier.success_creating'));
     }
-
-    public function update(SupplierUpdateRequest $request, Supplier $supplier)
+    public function update(SupplierUpdateRequest $request, Supplier $supplier): \Illuminate\Http\RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $supplierData = $request->validated();
-        if ($request->hasFile('avatar')) {
 
+        if ($request->hasFile('avatar')) {
             if ($supplier->avatar) {
                 Storage::disk('public')->delete($supplier->avatar);
             }
@@ -54,6 +57,10 @@ class SupplierController extends Controller
         }
 
         $supplier->update($supplierData);
+
+        if ($request->wantsJson()) {
+            return response()->json($supplier, 200);
+        }
 
         return redirect()->route('suppliers.index')
             ->with('success', __('supplier.success_updating'));

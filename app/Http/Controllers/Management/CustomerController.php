@@ -40,7 +40,7 @@ class CustomerController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
     public function store(CustomerStoreRequest $request)
     {
@@ -51,10 +51,13 @@ class CustomerController extends Controller
             $customerData['avatar'] = $request->file('avatar')->store('customers', 'public');
         }
 
-        Customer::create($customerData);
+        $customer = Customer::create($customerData);
 
-        return redirect()->route('customers.index')
-            ->with('success', __('customer.success_creating'));
+
+
+        return response()->json($customer, 201);
+
+
     }
 
     /**
@@ -68,7 +71,7 @@ class CustomerController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
     public function update(CustomerUpdateRequest $request, Customer $customer)
     {
@@ -83,8 +86,9 @@ class CustomerController extends Controller
 
         $customer->update($customerData);
 
-        return redirect()->route('customers.index')
-            ->with('success', __('customer.success_updating'));
+        return response()->json($customer);
+
+
     }
 
     public function destroy(Customer $customer): JsonResponse

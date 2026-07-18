@@ -58,7 +58,8 @@ class Product extends Model
         'barcode',
         'price',
         'quantity',
-        'status'
+        'status',
+        'category',
     ];
 
     protected $casts = [
