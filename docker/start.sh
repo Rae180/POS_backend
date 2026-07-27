@@ -4,5 +4,7 @@ envsubst '${PORT}' < /etc/nginx/sites-available/default.template > /etc/nginx/si
 php artisan config:cache
 php artisan route:cache
 php artisan migrate --force
+php artisan db:seed --class=RolePermissionSeeder --force
+php artisan db:seed --class=UserSeeder --force
 service nginx start
 php-fpm
