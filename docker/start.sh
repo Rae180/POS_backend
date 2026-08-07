@@ -6,5 +6,8 @@ php artisan route:cache
 php artisan migrate --force
 php artisan db:seed --class=RolePermissionSeeder --force
 php artisan db:seed --class=UserSeeder --force
+php artisan db:seed --class=ProductSeeder --force
+php artisan db:seed --class=CustomerSeeder --force
+php artisan db:seed --class=SettingsSeeder --force
 service nginx start
 php-fpm
