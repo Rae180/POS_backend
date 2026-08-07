@@ -12,6 +12,7 @@ use App\Http\Controllers\Pos\CartController;
 use App\Http\Controllers\Pos\OrderController;
 use App\Http\Controllers\Pos\ShiftController;
 use App\Http\Controllers\Settings\SettingController;
+use App\Http\Controllers\Management\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -73,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('products', ProductController::class)->except(['index', 'show']);
         Route::apiResource('suppliers', SupplierController::class);
+        Route::apiResource('users', UserController::class)->only(['index', 'store', 'destroy']);
 
         Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
         Route::post('/orders/{order}/refund', [OrderController::class, 'refund']);

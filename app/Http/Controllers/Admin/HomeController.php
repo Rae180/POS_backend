@@ -16,13 +16,27 @@ class HomeController extends Controller
      */
     public function __invoke(): Factory|View|\Illuminate\View\View
     {
-        $orders = Order::with(['items', 'payments'])->get();
+        $ordersCount = 0;
+        $income = 0.0;
+        $incomeToday = 0.0;
+        $today = today();
+
+        Order::with(['items', 'payments'])
+            ->lazy()
+            ->each(function (Order $order) use (&$ordersCount, &$income, &$incomeToday, $today): void {
+                $ordersCount++;
+                $applied = min($order->receivedAmount(), $order->total());
+                $income += $applied;
+
+                if ($order->created_at->greaterThanOrEqualTo($today)) {
+                    $incomeToday += $applied;
+                }
+            });
 
         return view('home', [
-            'orders_count' => $orders->count(),
-            'income' => $orders->sum(fn($order): float => min($order->receivedAmount(), $order->total())),
-            'income_today' => $orders->where('created_at', '>=', today())
-                ->sum(fn($order): float => min($order->receivedAmount(), $order->total())),
+            'orders_count' => $ordersCount,
+            'income' => $income,
+            'income_today' => $incomeToday,
             'customers_count' => Customer::count(),
             'low_stock_products' => Product::lowStock()->get(),
             'best_selling_products' => Product::bestSelling()->get(),
